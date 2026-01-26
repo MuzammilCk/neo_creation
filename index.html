@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neo-Brutalist Reasoner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Work+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Work Sans"', 'sans-serif'],
+              mono: ['"Space Mono"', 'monospace'],
+            },
+            colors: {
+              'neo-bg': '#f0f0eb',
+              'neo-yellow': '#ffde00',
+              'neo-pink': '#ff90e8',
+              'neo-blue': '#23a6d5',
+              'neo-green': '#39ff14',
+            },
+            boxShadow: {
+              'neo': '5px 5px 0px 0px rgba(0,0,0,1)',
+              'neo-sm': '3px 3px 0px 0px rgba(0,0,0,1)',
+              'neo-hover': '2px 2px 0px 0px rgba(0,0,0,1)',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #f0f0eb;
+      }
+      /* Custom Scrollbar for Neo Look */
+      ::-webkit-scrollbar {
+        width: 12px;
+        border-left: 2px solid black;
+      }
+      ::-webkit-scrollbar-track {
+        background: #fff;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #000;
+        border: 2px solid white;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #333;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "uuid": "https://esm.sh/uuid@^13.0.0",
+    "d3": "https://esm.sh/d3@^7.9.0",
+    "clsx": "https://esm.sh/clsx@^2.1.1"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

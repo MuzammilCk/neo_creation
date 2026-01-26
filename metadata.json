@@ -1,0 +1,5 @@
+{
+  "name": "Neo-Brutalist Reasoner",
+  "description": "A Gemini-powered chat dashboard featuring video analysis, Neo-Brutalism design, and a real-time D3.js visualization of the model's reasoning chain.",
+  "requestFramePermissions": []
+}
