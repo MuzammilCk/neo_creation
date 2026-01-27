@@ -11,18 +11,22 @@ const ReasoningFlow: React.FC<ReasoningFlowProps> = ({ steps }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!svgRef.current || !containerRef.current || steps.length === 0) return;
+    if (!svgRef.current || !containerRef.current) return;
 
+    // Use a default height if no steps, otherwise dynamic
     const width = containerRef.current.clientWidth;
     const nodeHeight = 80;
     const nodeWidth = 240;
     const verticalSpacing = 120;
-    const height = Math.max(containerRef.current.clientHeight, steps.length * verticalSpacing + 100);
+    const calculatedHeight = steps.length * verticalSpacing + 100;
+    const height = Math.max(containerRef.current.clientHeight, calculatedHeight > 0 ? calculatedHeight : 300);
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove(); // Clear previous
 
     svg.attr("width", width).attr("height", height);
+
+    if (steps.length === 0) return;
 
     // Arrow marker
     svg.append("defs").append("marker")
@@ -76,11 +80,9 @@ const ReasoningFlow: React.FC<ReasoningFlowProps> = ({ steps }) => {
           return '#fff';
       })
       .attr("stroke", "#000")
-      .attr("stroke-width", 3)
-      // SVG drop shadow simulated by a second rect would be complex, 
-      // simple hard stroke fits well enough, or we can offset another rect
+      .attr("stroke-width", 3);
       
-    // Shadow rect (visual candy)
+    // Shadow rect
     nodes.insert("rect", "rect")
       .attr("x", -nodeWidth / 2 + 6)
       .attr("y", -nodeHeight / 2 + 6)
@@ -95,8 +97,8 @@ const ReasoningFlow: React.FC<ReasoningFlowProps> = ({ steps }) => {
         .attr("width", nodeWidth)
         .attr("height", nodeHeight)
         .attr("fill", (d) => {
-            if (d.status === 'completed') return '#f0f0eb'; // Off white when done
-            if (d.status === 'active') return '#ffde00'; // Yellow when active
+            if (d.status === 'completed') return '#f0f0eb'; 
+            if (d.status === 'active') return '#ffde00';
             return '#fff';
         })
         .attr("stroke", "#000")
@@ -104,22 +106,32 @@ const ReasoningFlow: React.FC<ReasoningFlowProps> = ({ steps }) => {
 
     // Text: Step Title
     nodes.append("text")
-      .attr("dy", "-0.5em")
+      .attr("dy", "-0.8em")
       .attr("text-anchor", "middle")
       .text(d => d.title.length > 25 ? d.title.substring(0, 22) + "..." : d.title)
       .attr("font-family", '"Space Mono", monospace')
       .attr("font-weight", "bold")
       .attr("font-size", "14px")
       .attr("fill", "#000");
-
-    // Text: Step Number
+    
+    // Text: Step Details (truncated)
     nodes.append("text")
-      .attr("dy", "1.2em")
+      .attr("dy", "0.5em")
       .attr("text-anchor", "middle")
-      .text(d => `STEP ${d.stepNumber}`)
+      .text(d => d.details.length > 30 ? d.details.substring(0, 28) + "..." : d.details)
       .attr("font-family", '"Work Sans", sans-serif')
-      .attr("font-size", "12px")
-      .attr("fill", "#555");
+      .attr("font-size", "11px")
+      .attr("fill", "#333");
+
+    // Text: Step ID/Timestamp
+    nodes.append("text")
+      .attr("dy", "2em")
+      .attr("text-anchor", "middle")
+      .text(d => d.relatedTimestamp ? `TIME: ${d.relatedTimestamp}s` : `ID: ${d.stepId.substring(0,8)}`)
+      .attr("font-family", '"Work Sans", sans-serif')
+      .attr("font-size", "10px")
+      .attr("fill", "#555")
+      .attr("font-weight", "bold");
 
   }, [steps]);
 
@@ -127,7 +139,7 @@ const ReasoningFlow: React.FC<ReasoningFlowProps> = ({ steps }) => {
     <div ref={containerRef} className="w-full h-full overflow-y-auto bg-neo-bg relative">
         {steps.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center text-gray-400 font-mono text-center p-8">
-                WAITING FOR<br/>REASONING SIGNAL...
+                WAITING FOR<br/>REASONING CHAIN...
             </div>
         )}
       <svg ref={svgRef} className="block min-h-full"></svg>

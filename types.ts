@@ -4,18 +4,46 @@ export interface HistoryItem {
   timestamp: Date;
 }
 
-export interface ReasoningStep {
-  id: string;
-  stepNumber: number;
-  title: string;
+export interface DetectedEvent {
+  timestamp: number; // Seconds
   description: string;
-  status: 'pending' | 'active' | 'completed';
+  boundingBox?: [number, number, number, number]; // [ymin, xmin, ymax, xmax]
+  riskLevel: 'low' | 'medium' | 'critical';
 }
 
-export interface AnalysisData {
+export interface ReasoningStep {
+  stepId: string;
   title: string;
+  details: string;
+  relatedTimestamp?: number;
+  alternativesConsidered?: string[];
+  // UI specific fields (mapped after API response)
+  status?: 'pending' | 'active' | 'completed';
+}
+
+export interface AnalysisResult {
   summary: string;
-  risk_score: number;
+  riskScore: number;
+  detectedEvents: DetectedEvent[];
+  reasoningChain: ReasoningStep[];
+}
+
+export interface SongAnalysis {
+  technical: {
+    bpm: number;
+    key: string;
+    timeSignature: string;
+    genre: string;
+  };
+  mood: {
+    primary: string;
+    tags: string[];
+    colorCode: string;
+  };
+  structure: {
+    instrumentation: string[];
+    vocals: 'Male' | 'Female' | 'Instrumental' | 'Choir';
+  };
 }
 
 export interface Message {
@@ -23,7 +51,8 @@ export interface Message {
   role: 'user' | 'model';
   content: string;
   attachments?: FileAttachment[];
-  analysisData?: AnalysisData;
+  analysisResult?: AnalysisResult;
+  musicResult?: SongAnalysis;
   timestamp: Date;
   isStreaming?: boolean;
 }
@@ -34,8 +63,15 @@ export interface FileAttachment {
   data: string; // Base64
 }
 
-export interface ChatSession {
+export interface SessionData {
   id: string;
+  title: string;
+  timestamp: Date;
   messages: Message[];
-  reasoningChain: ReasoningStep[];
+  steps: ReasoningStep[];
+  mode: AppMode;
+  persona: Persona;
 }
+
+export type Persona = 'Safety' | 'Cinematography' | 'Copyright';
+export type AppMode = 'video' | 'music';
