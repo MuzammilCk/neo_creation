@@ -46,6 +46,21 @@ export interface SongAnalysis {
   };
 }
 
+export interface AgentPlan {
+  type: 'shorts' | 'remix' | 'soundtrack';
+  cuts?: { start: number; end: number; title: string }[];
+  remixIdeas?: { genre: string; elements: string }[];
+  soundtrackPrompt?: { prompt: string; bpm: number; mood: string };
+  rawText?: string; 
+}
+
+export interface ActionResult {
+  success: boolean;
+  message: string;
+  assetUrl?: string; // Blob URL for video/audio
+  assetType?: 'video' | 'audio';
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'model';
@@ -53,6 +68,8 @@ export interface Message {
   attachments?: FileAttachment[];
   analysisResult?: AnalysisResult;
   musicResult?: SongAnalysis;
+  agentPlan?: AgentPlan; // The plan from Gemini
+  actionResult?: ActionResult; // The result of executing the plan (FFmpeg output)
   timestamp: Date;
   isStreaming?: boolean;
 }

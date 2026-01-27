@@ -3,7 +3,7 @@ import { Music, ChevronLeft, ChevronRight } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import ReasoningFlow from './components/ReasoningFlow';
-import { Message, HistoryItem, ReasoningStep, FileAttachment, AnalysisResult, Persona, AppMode, SongAnalysis, SessionData } from './types';
+import { Message, HistoryItem, ReasoningStep, FileAttachment, AnalysisResult, Persona, AppMode, SongAnalysis, SessionData, AgentPlan } from './types';
 import { generateAnalysis, generateAgentAction } from './services/geminiService';
 import clsx from 'clsx';
 
@@ -205,11 +205,16 @@ const App: React.FC = () => {
 
       try {
           const contextString = JSON.stringify(context);
-          const responseText = await generateAgentAction(action, contextString);
+          const plan = await generateAgentAction(action, contextString);
 
           setMessages(prev => prev.map(m => 
               m.id === modelMsgId 
-              ? { ...m, content: responseText, isStreaming: false } 
+              ? { 
+                  ...m, 
+                  content: "Plan Generated", 
+                  agentPlan: plan,
+                  isStreaming: false 
+                } 
               : m
           ));
       } catch (error) {
@@ -244,13 +249,13 @@ const App: React.FC = () => {
       {/* CENTER: Chat Area */}
       <div className="flex-1 flex flex-col h-full min-w-[400px]">
         <div className="p-4 border-b-4 border-black bg-white flex justify-between items-center">
-             <h2 className="text-xl font-bold font-mono">DASHBOARD // {appMode === 'music' ? 'SONIC_ANALYZER' : 'VISUAL_INTELLIGENCE'}</h2>
+             <h2 className="text-xl font-bold font-mono">NEO_STUDIO // {appMode === 'music' ? 'SONIC_LAB' : 'VISUAL_ENGINE'}</h2>
              <div className="flex gap-2">
                  <div className="bg-neo-blue text-white px-2 py-1 text-xs border-2 border-black font-bold shadow-neo-sm">
-                    GEMINI 3 FLASH
+                    GEMINI 3
                  </div>
                  <div className="bg-neo-green px-2 py-1 text-xs border-2 border-black font-bold shadow-neo-sm">
-                    JSON MODE
+                    AGENT ACTIVE
                  </div>
              </div>
         </div>
