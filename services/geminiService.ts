@@ -12,7 +12,8 @@ const getClient = () => {
 const PERSONA_PROMPTS: Record<Persona, string> = {
   Safety: 'Focus on hazards, fire, structural risks, and unsafe human behaviors.',
   Cinematography: 'Analyze lighting, camera angles, color grading, composition, and visual style.',
-  Copyright: 'Identify brand logos, watermarks, copyrighted characters, and potential IP infringements.'
+  Copyright: 'Identify brand logos, watermarks, copyrighted characters, and potential IP infringements.',
+  Feynman: 'You are a strict but helpful tutor. Watch the math/logic on paper. Identify INCORRECT steps. "Risk Score" is now "Error Probability" (0-100). "Detected Events" are specific mistakes or logic flaws.'
 };
 
 const ANALYSIS_SCHEMA: Schema = {
@@ -223,13 +224,15 @@ export const generateAgentAction = async (
         1. A catchy title for the short.
         2. The exact FFmpeg command to cut this clip (assume input file is 'input.mp4').
         
+        IMPORTANT: Wrap the ffmpeg commands in code blocks.
+        
         ANALYSIS CONTEXT:
         ${contextData}
         `;
     } else if (actionType === 'remix') {
         prompt = `
         Based on the following song analysis (BPM, Key, Mood), suggest 3 creative remix directions.
-        For each, describe the new genre style and specific production elements to add.
+        For each, describe the new genre style and specific production elements to add (Drums, Synth, FX).
         
         ANALYSIS CONTEXT:
         ${contextData}
@@ -238,7 +241,11 @@ export const generateAgentAction = async (
         prompt = `
         Based on the following video analysis, act as a Musical Director.
         Generate a highly detailed text prompt for an AI Music Generator (like MusicLM/Suno) that perfectly matches the video's emotion, pacing, and events.
-        Include BPM, Instruments, Vibe, and Structural changes.
+        
+        Format as:
+        **PROMPT:** [The prompt text]
+        **BPM:** [Value]
+        **MOOD:** [Descriptors]
         
         ANALYSIS CONTEXT:
         ${contextData}

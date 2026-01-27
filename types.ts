@@ -73,5 +73,5 @@ export interface SessionData {
   persona: Persona;
 }
 
-export type Persona = 'Safety' | 'Cinematography' | 'Copyright';
+export type Persona = 'Safety' | 'Cinematography' | 'Copyright' | 'Feynman';
 export type AppMode = 'video' | 'music';

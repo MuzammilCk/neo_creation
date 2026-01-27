@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Send, Paperclip, FileVideo, Music, X, Zap, Volume2, Clapperboard, Disc, Wand2 } from 'lucide-react';
+import { Send, Paperclip, FileVideo, Music, X, Zap, Volume2, Clapperboard, Disc, Wand2, Headphones, Copy, Check } from 'lucide-react';
 import { Message, FileAttachment, Persona, AppMode } from '../types';
 import MusicDashboard from './MusicDashboard';
 import clsx from 'clsx';
@@ -26,6 +26,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -111,11 +112,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       } else if (selectedPersona === 'Cinematography') {
           utterance.pitch = 1.1; // Enthusiastic
           utterance.rate = 1.0;
+      } else if (selectedPersona === 'Feynman') {
+          utterance.pitch = 1.0; // Normal, helpful
+          utterance.rate = 1.1; // Slightly faster/energetic
       } else {
           utterance.pitch = 0.9; // Formal
       }
       
       window.speechSynthesis.speak(utterance);
+  };
+
+  const handleCopy = (text: string, id: string) => {
+      navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
   };
 
   return (
@@ -128,13 +138,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {/* Header with Persona Selector (Only for Video Mode) */}
       {appMode === 'video' && (
         <div className="p-2 border-b-2 border-black flex items-center justify-between bg-neo-bg">
-            <div className="text-xs font-mono font-bold flex gap-2">
-                {['Safety', 'Cinematography', 'Copyright'].map((p) => (
+            <div className="text-xs font-mono font-bold flex gap-2 overflow-x-auto pb-1">
+                {['Safety', 'Cinematography', 'Copyright', 'Feynman'].map((p) => (
                     <button
                         key={p}
                         onClick={() => !isStreaming && onSelectPersona(p as Persona)}
                         className={clsx(
-                            "px-3 py-1 border-2 border-black transition-all",
+                            "px-3 py-1 border-2 border-black transition-all whitespace-nowrap",
                             selectedPersona === p 
                                 ? "bg-black text-white shadow-neo-sm" 
                                 : "bg-white text-black hover:bg-gray-200",
@@ -251,7 +261,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                              <div className="p-6">
                                  <div className="flex items-center gap-6 mb-6">
                                      <div className="flex flex-col items-center">
-                                         <span className="font-mono text-xs font-bold mb-1">SCORE</span>
+                                         <span className="font-mono text-xs font-bold mb-1">
+                                             {selectedPersona === 'Feynman' ? 'ERROR_PROBABILITY' : 'RISK_SCORE'}
+                                         </span>
                                          <div className={clsx(
                                              "w-20 h-20 border-4 border-black flex items-center justify-center rounded-full text-2xl font-black shadow-neo-sm",
                                              msg.analysisResult.riskScore > 75 ? "bg-red-500 text-white" :
@@ -259,6 +271,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                              "bg-neo-green text-black"
                                          )}>
                                              {msg.analysisResult.riskScore}
+                                         </div>
+                                         <div className="mt-2 text-[10px] font-bold font-mono text-center">
+                                            {selectedPersona === 'Feynman' 
+                                                ? (msg.analysisResult.riskScore > 50 ? "LOGIC FLAW" : "VALID")
+                                                : (msg.analysisResult.riskScore > 75 ? "CRITICAL" : "SAFE")
+                                            }
                                          </div>
                                      </div>
                                      
@@ -330,113 +348,4 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                         onClick={() => onAgentAction('shorts', msg.analysisResult)}
                                         className="bg-white border-2 border-black px-3 py-1 font-mono text-xs font-bold shadow-neo-sm hover:translate-y-1 hover:shadow-none transition-all flex items-center gap-1 whitespace-nowrap"
                                      >
-                                         <Clapperboard size={12} /> VIRAL SHORTS
-                                     </button>
-                                     <button 
-                                        onClick={() => onAgentAction('soundtrack', msg.analysisResult)}
-                                        className="bg-white border-2 border-black px-3 py-1 font-mono text-xs font-bold shadow-neo-sm hover:translate-y-1 hover:shadow-none transition-all flex items-center gap-1 whitespace-nowrap"
-                                     >
-                                         <Wand2 size={12} /> SOUNDTRACK PROMPT
-                                     </button>
-                                 </div>
-                             )}
-                         </div>
-                     )}
-
-                     {/* STANDARD TEXT (Used for Action Results) */}
-                     {!msg.analysisResult && !msg.musicResult && msg.content && (
-                         <div className="bg-white border-4 border-black shadow-neo p-4 w-full md:w-[600px]">
-                             <div className="font-mono text-xs font-bold mb-2 text-gray-500 uppercase flex items-center gap-2">
-                                 <Zap size={14} className="text-neo-yellow fill-black" /> AGENT OUTPUT
-                             </div>
-                             <div className="whitespace-pre-wrap font-mono text-sm">{msg.content}</div>
-                         </div>
-                     )}
-
-                     {/* LOADING STATE */}
-                     {!msg.analysisResult && !msg.musicResult && !msg.content && (
-                         <div className="p-4 border-2 border-black border-dashed bg-gray-50 text-gray-500 font-mono animate-pulse w-full max-w-[400px]">
-                            {appMode === 'music' ? 'LISTENING TO AUDIO...' : `ANALYZING MEDIA WITH ${selectedPersona.toUpperCase()} PROTOCOLS...`}
-                            <div className="mt-2 text-xs opacity-50">
-                                Please wait for full JSON validation...
-                            </div>
-                         </div>
-                     )}
-                 </div>
-             )}
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Input Area */}
-      <div className="p-4 bg-neo-bg border-t-4 border-black">
-        {/* Attachment Previews */}
-        {attachments.length > 0 && (
-            <div className="flex gap-4 mb-4 overflow-x-auto pb-2">
-                {attachments.map((att, i) => (
-                    <div key={i} className="relative group bg-white border-2 border-black p-2 shadow-neo-sm min-w-[120px]">
-                        <button 
-                            onClick={() => removeAttachment(i)}
-                            className="absolute -top-3 -right-3 bg-red-500 text-white border-2 border-black w-6 h-6 flex items-center justify-center hover:scale-110 transition-transform"
-                        >
-                            <X size={12} />
-                        </button>
-                        <div className="h-16 w-full bg-gray-100 flex items-center justify-center mb-1 overflow-hidden">
-                            {att.type.startsWith('image') ? (
-                                <img src={att.data} alt="preview" className="h-full w-full object-cover" />
-                            ) : att.type.startsWith('audio') ? (
-                                <Music size={32} className="text-black" />
-                            ) : (
-                                <FileVideo size={32} className="text-gray-400"/>
-                            )}
-                        </div>
-                        <p className="text-[10px] font-mono truncate">{att.name}</p>
-                    </div>
-                ))}
-            </div>
-        )}
-
-        <div className="flex gap-2">
-            <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-white p-3 border-2 border-black shadow-neo hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-neo-hover transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none"
-            >
-                <Paperclip size={24} />
-            </button>
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                multiple 
-                accept={appMode === 'music' ? "audio/*" : "image/*,video/*"}
-                onChange={(e) => processFiles(e.target.files)}
-            />
-
-            <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder={appMode === 'music' ? "Ask about BPM, genre, mood..." : "Specific instructions..."}
-                className="flex-1 bg-white border-2 border-black p-3 font-mono focus:outline-none shadow-neo focus:shadow-neo-hover focus:translate-x-[2px] focus:translate-y-[2px] transition-all placeholder:text-gray-400"
-                disabled={isStreaming}
-            />
-            
-            <button 
-                onClick={handleSend}
-                disabled={isStreaming}
-                className={clsx(
-                    "bg-neo-green p-3 border-2 border-black shadow-neo transition-all",
-                    !isStreaming ? "hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-neo-hover active:translate-x-[4px] active:translate-y-[4px] active:shadow-none" : "opacity-50 cursor-not-allowed"
-                )}
-            >
-                <Send size={24} />
-            </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default ChatInterface;
+                                         <Cl
