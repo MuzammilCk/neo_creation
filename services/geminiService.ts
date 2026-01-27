@@ -97,7 +97,7 @@ const MUSIC_SCHEMA: Schema = {
 const ACTION_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
-    type: { type: Type.STRING, enum: ['shorts', 'remix', 'soundtrack'] },
+    type: { type: Type.STRING, enum: ['shorts', 'remix', 'soundtrack', 'visual_filter', 'music_overlay'] },
     cuts: {
         type: Type.ARRAY,
         items: {
@@ -127,7 +127,12 @@ const ACTION_SCHEMA: Schema = {
             bpm: { type: Type.NUMBER },
             mood: { type: Type.STRING }
         }
-    }
+    },
+    // Visual Filter properties
+    filterType: { type: Type.STRING, enum: ['grayscale', 'high_contrast', 'noise', 'sepia'] },
+    filterReasoning: { type: Type.STRING },
+    // Audio Merge properties
+    audioTrackName: { type: Type.STRING }
   }
 };
 
@@ -217,14 +222,12 @@ export const generateAnalysis = async (
   let result = await callGemini(contents, systemInstruction, responseSchema);
 
   // THOUGHT-LOOP: SELF-CORRECTION
-  // If Risk Score is High (>75) OR Feynman detects critical logic flaw (>50)
   if (mode === 'video') {
       const riskThreshold = persona === 'Feynman' ? 50 : 75;
       
       if (result.riskScore > riskThreshold) {
           console.log("Deep Thought Loop Triggered");
           
-          // Synthesize a self-reflection prompt
           const reflectionPrompt = "CRITICAL: High risk/error detected. Re-evaluate the specific timestamps. Are these false positives? Update reasoning chain with a 'Deep Review' step.";
           
           contents.push({ role: 'model', parts: [{ text: JSON.stringify(result) }] });
@@ -232,7 +235,6 @@ export const generateAnalysis = async (
 
           const secondPass = await callGemini(contents, systemInstruction, responseSchema);
 
-          // Merge Logic: Keep the safer/more accurate result, but append reasoning steps
           const combinedSteps = [
               ...result.reasoningChain.map((s: any) => ({ ...s, status: 'completed' })),
               { stepId: 'loop-trigger', title: 'SYSTEM 2 TRIGGER', details: 'High risk triggered deep review loop.', status: 'completed' },
@@ -248,7 +250,7 @@ export const generateAnalysis = async (
 };
 
 export const generateAgentAction = async (
-    actionType: 'shorts' | 'remix' | 'soundtrack',
+    actionType: 'shorts' | 'remix' | 'soundtrack' | 'visual_filter' | 'music_overlay',
     contextData: string
 ): Promise<AgentPlan> => {
     const ai = getClient();
@@ -270,6 +272,21 @@ export const generateAgentAction = async (
         prompt = `
         Generate a MusicLM prompt. Return JSON.
         ANALYSIS CONTEXT: ${contextData}
+        `;
+    } else if (actionType === 'visual_filter') {
+        prompt = `
+        Analyze the mood from the context. Select ONE visual filter to apply:
+        - 'grayscale': For noir, serious, or timeless vibes.
+        - 'high_contrast': For dramatic, intense, or action-packed vibes.
+        - 'noise': For raw, brutalist, chaotic, or horror vibes.
+        - 'sepia': For vintage, nostalgic, or warm vibes.
+        
+        Provide the 'filterType' and a short 'filterReasoning'.
+        ANALYSIS CONTEXT: ${contextData}
+        `;
+    } else if (actionType === 'music_overlay') {
+        prompt = `
+        Confirm the action to overlay music. Return JSON with type 'music_overlay'.
         `;
     }
 

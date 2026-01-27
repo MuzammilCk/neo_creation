@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Send, Paperclip, FileVideo, Music, X, Zap, Volume2, Clapperboard, Disc, Wand2, Headphones, Copy, Check, Mic, Download, Play, Loader2 } from 'lucide-react';
+import { Send, Paperclip, FileVideo, Music, X, Zap, Volume2, Clapperboard, Disc, Wand2, Headphones, Copy, Check, Mic, Download, Play, Loader2, Palette, Layers } from 'lucide-react';
 import { Message, FileAttachment, Persona, AppMode, ActionResult } from '../types';
 import MusicDashboard from './MusicDashboard';
 import { ffmpegService } from '../services/ffmpegService';
@@ -12,7 +12,7 @@ interface ChatInterfaceProps {
   selectedPersona: Persona;
   onSelectPersona: (p: Persona) => void;
   appMode: AppMode;
-  onAgentAction: (action: 'shorts' | 'remix' | 'soundtrack', context: any) => void;
+  onAgentAction: (action: 'shorts' | 'remix' | 'soundtrack' | 'visual_filter' | 'music_overlay', context: any) => void;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ 
@@ -126,44 +126,93 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       window.speechSynthesis.speak(utterance);
   };
 
+  // HELPERS FOR FILES
+  const getLatestAttachment = (type: 'video' | 'audio'): FileAttachment | undefined => {
+      // Search backwards through history for the latest file of specific type
+      for (let i = messages.length - 1; i >= 0; i--) {
+          const msg = messages[i];
+          if (msg.role === 'user' && msg.attachments) {
+              const att = msg.attachments.find(a => a.type.startsWith(type));
+              if (att) return att;
+          }
+      }
+      return undefined;
+  };
+
+  const getFileFromAttachment = async (att: FileAttachment, filename: string): Promise<File> => {
+      const res = await fetch(att.data);
+      const blob = await res.blob();
+      return new File([blob], filename, { type: att.type });
+  }
+
   // CLIENT-SIDE EXECUTION (FFmpeg)
   const handleExecuteCut = async (msgId: string, planIndex: number, start: number, end: number) => {
-      // Find the original video attachment in history. 
-      // Assumption: The video is in the closest previous user message.
-      const lastUserMsg = messages.filter(m => m.role === 'user' && m.attachments?.some(a => a.type.startsWith('video'))).pop();
-      if (!lastUserMsg || !lastUserMsg.attachments) {
-          alert("No source video found to cut.");
-          return;
-      }
-      
-      const videoAtt = lastUserMsg.attachments.find(a => a.type.startsWith('video'));
-      if (!videoAtt) return;
+      const videoAtt = getLatestAttachment('video');
+      if (!videoAtt) { alert("No source video found."); return; }
 
       setProcessingVideo(`${msgId}-${planIndex}`);
 
       try {
-          // Convert base64 back to File for FFmpeg
-          const res = await fetch(videoAtt.data);
-          const blob = await res.blob();
-          const file = new File([blob], "input.mp4", { type: "video/mp4" });
-
+          const file = await getFileFromAttachment(videoAtt, "input.mp4");
           const url = await ffmpegService.cutVideo(file, start, end);
-          
-          // Force download
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `viral_short_${start}_${end}.mp4`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-
+          downloadBlob(url, `viral_short_${start}_${end}.mp4`);
       } catch (error) {
           console.error(error);
-          alert("Video processing failed. Browser may block SharedArrayBuffer.");
+          alert("Video processing failed.");
       } finally {
           setProcessingVideo(null);
       }
   };
+
+  const handleApplyFilter = async (msgId: string, filterType: 'grayscale' | 'high_contrast' | 'noise' | 'sepia') => {
+      const videoAtt = getLatestAttachment('video');
+      if (!videoAtt) { alert("No source video found."); return; }
+
+      setProcessingVideo(`${msgId}-filter`);
+
+      try {
+          const file = await getFileFromAttachment(videoAtt, "input.mp4");
+          const url = await ffmpegService.applyFilter(file, filterType);
+          downloadBlob(url, `video_${filterType}.mp4`);
+      } catch (error) {
+          console.error(error);
+          alert("Filter application failed.");
+      } finally {
+          setProcessingVideo(null);
+      }
+  };
+
+  const handleMergeAudio = async (msgId: string) => {
+      const videoAtt = getLatestAttachment('video');
+      const audioAtt = getLatestAttachment('audio');
+      
+      if (!videoAtt || !audioAtt) { alert("Need both video and audio in history."); return; }
+
+      setProcessingVideo(`${msgId}-merge`);
+
+      try {
+          const vFile = await getFileFromAttachment(videoAtt, "input.mp4");
+          const aFile = await getFileFromAttachment(audioAtt, "input.mp3");
+          const url = await ffmpegService.mergeAudio(vFile, aFile);
+          downloadBlob(url, `merged_av.mp4`);
+      } catch (error) {
+          console.error(error);
+          alert("Merge failed. Ensure file types are supported.");
+      } finally {
+          setProcessingVideo(null);
+      }
+  };
+
+  const downloadBlob = (url: string, filename: string) => {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+  };
+
+  const hasAudioInHistory = messages.some(m => m.attachments?.some(a => a.type.startsWith('audio')));
 
   return (
     <div 
@@ -256,9 +305,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                  </div>
                              </div>
                              {!isStreaming && (
-                                 <div className="bg-neo-bg border-t-4 border-black p-2 flex gap-2 overflow-x-auto">
-                                     <button onClick={() => onAgentAction('shorts', msg.analysisResult)} className="bg-white border-2 border-black px-3 py-1 font-mono text-xs font-bold shadow-neo-sm hover:translate-y-1 flex gap-1"><Clapperboard size={12} /> VIRAL SHORTS</button>
-                                     <button onClick={() => onAgentAction('soundtrack', msg.analysisResult)} className="bg-white border-2 border-black px-3 py-1 font-mono text-xs font-bold shadow-neo-sm hover:translate-y-1 flex gap-1"><Wand2 size={12} /> SCORE</button>
+                                 <div className="bg-neo-bg border-t-4 border-black p-2 flex gap-2 overflow-x-auto items-center">
+                                     <span className="font-mono text-xs font-bold mr-2">ACTIONS:</span>
+                                     <button onClick={() => onAgentAction('shorts', msg.analysisResult)} className="bg-white border-2 border-black px-3 py-1 font-mono text-xs font-bold shadow-neo-sm hover:translate-y-1 flex gap-1 items-center"><Clapperboard size={12} /> SHORTS</button>
+                                     <button onClick={() => onAgentAction('soundtrack', msg.analysisResult)} className="bg-white border-2 border-black px-3 py-1 font-mono text-xs font-bold shadow-neo-sm hover:translate-y-1 flex gap-1 items-center"><Wand2 size={12} /> SCORE</button>
+                                     <button onClick={() => onAgentAction('visual_filter', msg.analysisResult)} className="bg-white border-2 border-black px-3 py-1 font-mono text-xs font-bold shadow-neo-sm hover:translate-y-1 flex gap-1 items-center"><Palette size={12} /> AI STYLE</button>
+                                     {hasAudioInHistory && (
+                                         <button onClick={() => onAgentAction('music_overlay', msg.analysisResult)} className="bg-neo-pink text-black border-2 border-black px-3 py-1 font-mono text-xs font-bold shadow-neo-sm hover:translate-y-1 flex gap-1 items-center"><Layers size={12} /> MERGE AUDIO</button>
+                                     )}
                                  </div>
                              )}
                          </div>
@@ -271,6 +325,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                 <div className="font-mono text-xs font-bold uppercase flex items-center gap-2"><Zap size={14} className="text-neo-yellow fill-neo-yellow" /> AGENT EXECUTION PLAN</div>
                              </div>
                              <div className="p-4 bg-gray-100 font-mono text-sm">
+                                {/* SHORTS */}
                                 {msg.agentPlan.type === 'shorts' && msg.agentPlan.cuts && (
                                     <div className="space-y-3">
                                         <p className="font-bold">Proposed Viral Cuts:</p>
@@ -292,6 +347,46 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                         ))}
                                     </div>
                                 )}
+                                
+                                {/* VISUAL FILTER */}
+                                {msg.agentPlan.type === 'visual_filter' && msg.agentPlan.filterType && (
+                                    <div className="space-y-2">
+                                        <div className="bg-white border-2 border-black p-3">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="font-black text-lg uppercase">{msg.agentPlan.filterType.replace('_', ' ')}</span>
+                                                <div className="bg-neo-yellow px-2 py-0.5 text-[10px] font-bold border border-black">AI SELECTED</div>
+                                            </div>
+                                            <p className="text-xs italic text-gray-600 mb-3">{msg.agentPlan.filterReasoning}</p>
+                                            <button 
+                                                onClick={() => handleApplyFilter(msg.id, msg.agentPlan!.filterType!)}
+                                                disabled={processingVideo === `${msg.id}-filter`}
+                                                className="w-full bg-neo-green text-black border-2 border-black px-2 py-2 text-xs font-bold hover:bg-green-400 flex items-center justify-center gap-2"
+                                            >
+                                                {processingVideo === `${msg.id}-filter` ? <Loader2 size={14} className="animate-spin"/> : <Palette size={14}/>}
+                                                APPLY FILTER & RENDER
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* MUSIC OVERLAY */}
+                                {msg.agentPlan.type === 'music_overlay' && (
+                                    <div className="space-y-2">
+                                        <div className="bg-white border-2 border-black p-3">
+                                            <p className="font-bold mb-2">Merge Background Audio</p>
+                                            <p className="text-xs text-gray-600 mb-3">Combines the latest video with the latest audio track found in history.</p>
+                                            <button 
+                                                onClick={() => handleMergeAudio(msg.id)}
+                                                disabled={processingVideo === `${msg.id}-merge`}
+                                                className="w-full bg-neo-pink text-black border-2 border-black px-2 py-2 text-xs font-bold hover:bg-pink-400 flex items-center justify-center gap-2"
+                                            >
+                                                {processingVideo === `${msg.id}-merge` ? <Loader2 size={14} className="animate-spin"/> : <Layers size={14}/>}
+                                                MERGE TRACKS
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {msg.agentPlan.type === 'remix' && (
                                     <pre className="whitespace-pre-wrap text-xs">{JSON.stringify(msg.agentPlan.remixIdeas, null, 2)}</pre>
                                 )}

@@ -47,10 +47,16 @@ export interface SongAnalysis {
 }
 
 export interface AgentPlan {
-  type: 'shorts' | 'remix' | 'soundtrack';
+  type: 'shorts' | 'remix' | 'soundtrack' | 'visual_filter' | 'music_overlay';
   cuts?: { start: number; end: number; title: string }[];
   remixIdeas?: { genre: string; elements: string }[];
   soundtrackPrompt?: { prompt: string; bpm: number; mood: string };
+  // New fields for filters
+  filterType?: 'grayscale' | 'high_contrast' | 'noise' | 'sepia';
+  filterReasoning?: string;
+  // New fields for audio merge
+  audioTrackName?: string;
+  
   rawText?: string; 
 }
 
