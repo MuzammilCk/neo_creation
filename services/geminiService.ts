@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI, Type, Schema, Content } from "@google/genai";
 import { Message, FileAttachment, AnalysisResult, Persona, AppMode, SongAnalysis } from '../types';
 
 const getClient = () => {
@@ -96,30 +96,71 @@ export const generateAnalysis = async (
   currentPrompt: string,
   attachments: FileAttachment[],
   persona: Persona,
-  mode: AppMode
+  mode: AppMode,
+  history: Message[] = []
 ): Promise<AnalysisResult | SongAnalysis> => {
   const ai = getClient();
   const modelId = 'gemini-3-flash-preview'; 
 
-  const parts: any[] = [];
+  // 1. Construct History
+  const contents: Content[] = history.filter(msg => !msg.isStreaming).map(msg => {
+    const parts: any[] = [];
+    
+    // Attachments (for User messages)
+    if (msg.role === 'user' && msg.attachments) {
+        msg.attachments.forEach(att => {
+            const base64Data = att.data.split(',')[1];
+            parts.push({
+                inlineData: {
+                    mimeType: att.type,
+                    data: base64Data
+                }
+            });
+        });
+    }
 
-  // Add attachments
+    // Text Content
+    if (msg.role === 'user') {
+        parts.push({ text: msg.content });
+    } else {
+        // For model, we need to serialize the previous result so the context is maintained
+        // otherwise the model forgets what it analyzed.
+        const contextText = msg.analysisResult 
+            ? JSON.stringify(msg.analysisResult) 
+            : msg.musicResult 
+            ? JSON.stringify(msg.musicResult)
+            : msg.content;
+        parts.push({ text: contextText });
+    }
+
+    return {
+        role: msg.role,
+        parts: parts
+    };
+  });
+
+  // 2. Add Current Request
+  const currentParts: any[] = [];
   attachments.forEach(att => {
     const base64Data = att.data.split(',')[1]; 
-    parts.push({
+    currentParts.push({
       inlineData: {
         mimeType: att.type,
         data: base64Data
       }
     });
   });
+  
+  const promptText = mode === 'music' 
+    ? (currentPrompt || "Analyze this audio track.") 
+    : (currentPrompt || `Analyze this media using the ${persona} persona.`);
+    
+  currentParts.push({ text: promptText });
 
-  // Add text prompt
-  if (mode === 'music') {
-     parts.push({ text: currentPrompt || "Analyze this audio track." });
-  } else {
-     parts.push({ text: currentPrompt || `Analyze this media using the ${persona} persona.` });
-  }
+  contents.push({
+      role: 'user',
+      parts: currentParts
+  });
 
   let systemInstruction = "";
   let responseSchema: Schema;
@@ -146,9 +187,7 @@ export const generateAnalysis = async (
   try {
     const result = await ai.models.generateContent({
       model: modelId,
-      contents: {
-        parts: parts
-      },
+      contents: contents,
       config: {
         systemInstruction: systemInstruction,
         temperature: 0.2, 
@@ -168,6 +207,58 @@ export const generateAnalysis = async (
     throw error;
   }
 };
+
+export const generateAgentAction = async (
+    actionType: 'shorts' | 'remix' | 'soundtrack',
+    contextData: string
+): Promise<string> => {
+    const ai = getClient();
+    const modelId = 'gemini-3-flash-preview'; 
+    
+    let prompt = "";
+    if (actionType === 'shorts') {
+        prompt = `
+        Based on the following video analysis, identify 3 viral-worthy moments.
+        Output a PLAN with:
+        1. A catchy title for the short.
+        2. The exact FFmpeg command to cut this clip (assume input file is 'input.mp4').
+        
+        ANALYSIS CONTEXT:
+        ${contextData}
+        `;
+    } else if (actionType === 'remix') {
+        prompt = `
+        Based on the following song analysis (BPM, Key, Mood), suggest 3 creative remix directions.
+        For each, describe the new genre style and specific production elements to add.
+        
+        ANALYSIS CONTEXT:
+        ${contextData}
+        `;
+    } else if (actionType === 'soundtrack') {
+        prompt = `
+        Based on the following video analysis, act as a Musical Director.
+        Generate a highly detailed text prompt for an AI Music Generator (like MusicLM/Suno) that perfectly matches the video's emotion, pacing, and events.
+        Include BPM, Instruments, Vibe, and Structural changes.
+        
+        ANALYSIS CONTEXT:
+        ${contextData}
+        `;
+    }
+
+    try {
+        const result = await ai.models.generateContent({
+            model: modelId,
+            contents: prompt,
+            config: {
+                temperature: 0.7,
+            }
+        });
+        return result.text || "Could not generate action plan.";
+    } catch (error) {
+        console.error("Agent Action Error:", error);
+        return "Agent failed to execute action.";
+    }
+}
 
 export const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {

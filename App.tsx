@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Music, ChevronLeft, ChevronRight } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import ReasoningFlow from './components/ReasoningFlow';
 import { Message, HistoryItem, ReasoningStep, FileAttachment, AnalysisResult, Persona, AppMode, SongAnalysis, SessionData } from './types';
-import { generateAnalysis } from './services/geminiService';
+import { generateAnalysis, generateAgentAction } from './services/geminiService';
 import clsx from 'clsx';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -13,13 +13,37 @@ const App: React.FC = () => {
   const [sessions, setSessions] = useState<Record<string, SessionData>>({});
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  
+  // State for the displayed steps (animated)
   const [steps, setSteps] = useState<ReasoningStep[]>([]);
+  // State for the full steps returned by API (buffer)
+  const [pendingSteps, setPendingSteps] = useState<ReasoningStep[]>([]);
+
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string>(generateId());
   const [persona, setPersona] = useState<Persona>('Safety');
   const [appMode, setAppMode] = useState<AppMode>('video');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isReasoningOpen, setIsReasoningOpen] = useState(true);
+
+  // Progressive Rendering Effect
+  useEffect(() => {
+    if (pendingSteps.length > steps.length) {
+        const timer = setTimeout(() => {
+            setSteps(prev => [
+                ...prev, 
+                { ...pendingSteps[prev.length], status: 'active' } // Set new one to active
+            ].map((s, i) => i < prev.length ? { ...s, status: 'completed' } : s)); // Set older ones to completed
+        }, 800); // 800ms delay per node for "thinking" effect
+        return () => clearTimeout(timer);
+    } else if (pendingSteps.length > 0 && steps.length === pendingSteps.length) {
+        // Ensure final state is all completed
+        const hasActive = steps.some(s => s.status !== 'completed');
+        if (hasActive) {
+            setSteps(prev => prev.map(s => ({ ...s, status: 'completed' })));
+        }
+    }
+  }, [pendingSteps, steps]);
 
   // Helper to save the current state to the session store
   const saveCurrentSession = () => {
@@ -33,7 +57,7 @@ const App: React.FC = () => {
          title: currentTitle,
          timestamp: timestamp,
          messages,
-         steps,
+         steps: pendingSteps, // Save the full chain
          mode: appMode,
          persona
      };
@@ -53,6 +77,7 @@ const App: React.FC = () => {
     setCurrentSessionId(newId);
     setMessages([]);
     setSteps([]);
+    setPendingSteps([]);
     // Optionally reset mode/persona, but keeping user preference is usually better
   };
 
@@ -64,7 +89,8 @@ const App: React.FC = () => {
     if (targetSession) {
         setCurrentSessionId(id);
         setMessages(targetSession.messages);
-        setSteps(targetSession.steps);
+        setPendingSteps(targetSession.steps);
+        setSteps(targetSession.steps); // Restore immediately, no animation for history
         setAppMode(targetSession.mode);
         setPersona(targetSession.persona);
     } else {
@@ -72,6 +98,7 @@ const App: React.FC = () => {
         setCurrentSessionId(id);
         setMessages([]);
         setSteps([]);
+        setPendingSteps([]);
     }
   };
 
@@ -85,9 +112,15 @@ const App: React.FC = () => {
       timestamp: new Date()
     };
     
-    setMessages(prev => [...prev, userMsg]);
+    // Create a new array including the user message to pass to context
+    const updatedMessages = [...messages, userMsg];
+
+    setMessages(updatedMessages);
     setIsStreaming(true);
+    
+    // Clear display steps to start fresh reasoning for new turn
     setSteps([]); 
+    setPendingSteps([]);
 
     // 2. Add placeholder Model Message
     const modelMsgId = generateId();
@@ -110,7 +143,8 @@ const App: React.FC = () => {
     }
 
     try {
-      const result = await generateAnalysis(text, attachments, persona, appMode);
+      // Pass the *entire* conversation history (excluding the placeholder model message we just added)
+      const result = await generateAnalysis(text, attachments, persona, appMode, updatedMessages);
       
       if (appMode === 'music') {
           const musicResult = result as SongAnalysis;
@@ -124,14 +158,13 @@ const App: React.FC = () => {
               } 
             : m
           ));
-          setSteps([]);
+          // Music schema currently has no reasoning chain
+          setPendingSteps([]);
       } else {
           const videoResult = result as AnalysisResult;
-          const reasoningSteps = videoResult.reasoningChain.map(s => ({
-              ...s,
-              status: 'completed' as const
-          }));
-          setSteps(reasoningSteps);
+          
+          // Trigger the progressive animation
+          setPendingSteps(videoResult.reasoningChain);
 
           setMessages(prev => prev.map(m => 
             m.id === modelMsgId 
@@ -157,6 +190,39 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAgentAction = async (action: 'shorts' | 'remix' | 'soundtrack', context: any) => {
+      setIsStreaming(true);
+      const modelMsgId = generateId();
+      
+      // Add placeholder for action result
+      setMessages(prev => [...prev, {
+          id: modelMsgId,
+          role: 'model',
+          content: 'Agent is thinking...',
+          timestamp: new Date(),
+          isStreaming: true
+      }]);
+
+      try {
+          const contextString = JSON.stringify(context);
+          const responseText = await generateAgentAction(action, contextString);
+
+          setMessages(prev => prev.map(m => 
+              m.id === modelMsgId 
+              ? { ...m, content: responseText, isStreaming: false } 
+              : m
+          ));
+      } catch (error) {
+          setMessages(prev => prev.map(m => 
+              m.id === modelMsgId 
+              ? { ...m, content: "Agent failed to complete the task.", isStreaming: false } 
+              : m
+          ));
+      } finally {
+          setIsStreaming(false);
+      }
+  };
+
   return (
     <div className="flex h-screen w-screen overflow-hidden font-sans text-black">
         
@@ -167,7 +233,7 @@ const App: React.FC = () => {
         onSelectChat={handleSelectSession} 
         currentMode={appMode}
         onSwitchMode={(m) => {
-            saveCurrentSession(); // Save before switching mode (which implies new context usually, but here just switches lens)
+            saveCurrentSession(); // Save before switching mode
             setAppMode(m);
         }}
         isOpen={isSidebarOpen}
@@ -195,6 +261,7 @@ const App: React.FC = () => {
             selectedPersona={persona}
             onSelectPersona={setPersona}
             appMode={appMode}
+            onAgentAction={handleAgentAction}
         />
       </div>
 
@@ -230,7 +297,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="bg-black text-white p-2 font-mono text-xs flex justify-between">
                     <span>{appMode === 'music' ? 'MODE: AUDIO' : `PERSONA: ${persona.toUpperCase()}`}</span>
-                    <span>NODES: {steps.length}</span>
+                    <span>NODES: {steps.length} / {pendingSteps.length > 0 ? pendingSteps.length : steps.length}</span>
                 </div>
             </>
         ) : (
