@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Send, Paperclip, FileVideo, Music, X, Zap, Volume2, Clapperboard, Disc, Wand2, Headphones, Copy, Check, Mic, Download, Play, Loader2, Palette, Layers } from 'lucide-react';
 import { Message, FileAttachment, Persona, AppMode, ActionResult } from '../types';
 import MusicDashboard from './MusicDashboard';
+import NeoVideoPlayer from './NeoVideoPlayer';
 import { ffmpegService } from '../services/ffmpegService';
 import clsx from 'clsx';
 
@@ -246,7 +247,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         <div className="flex flex-wrap gap-4 mb-3">
                             {msg.attachments.map((att, idx) => (
                                 <div key={idx} className="bg-black/20 p-2 rounded flex flex-col gap-2 w-full max-w-[300px]">
-                                    {att.type.startsWith('video') ? <video id={`media-${msg.id}`} controls src={att.data} className="w-full h-auto border-2 border-black" /> : att.type.startsWith('audio') ? <audio id={`media-${msg.id}`} controls src={att.data} className="w-full border-2 border-black" /> : <img src={att.data} alt="uploaded" className="w-full h-auto border-2 border-black" />}
+                                    {att.type.startsWith('video') ? (
+                                        <NeoVideoPlayer 
+                                            id={`media-${msg.id}`} 
+                                            src={att.data} 
+                                        />
+                                    ) : att.type.startsWith('audio') ? (
+                                        <audio id={`media-${msg.id}`} controls src={att.data} className="w-full border-2 border-black" />
+                                    ) : (
+                                        <img src={att.data} alt="uploaded" className="w-full h-auto border-2 border-black" />
+                                    )}
                                     <div className="flex items-center gap-2"><span className="text-xs font-mono truncate">{att.name}</span></div>
                                 </div>
                             ))}

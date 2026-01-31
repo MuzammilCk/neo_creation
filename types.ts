@@ -97,4 +97,4 @@ export interface SessionData {
 }
 
 export type Persona = 'Safety' | 'Cinematography' | 'Copyright' | 'Feynman';
-export type AppMode = 'video' | 'music';
+export type AppMode = 'video' | 'music' | 'live';

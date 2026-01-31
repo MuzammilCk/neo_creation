@@ -1,6 +1,6 @@
 import React from 'react';
 import { HistoryItem, AppMode } from '../types';
-import { Plus, MessageSquare, Video, Music, ChevronLeft, ChevronRight, LayoutDashboard } from 'lucide-react';
+import { Plus, MessageSquare, Video, Music, ChevronLeft, ChevronRight, LayoutDashboard, AudioLines } from 'lucide-react';
 import clsx from 'clsx';
 
 interface SidebarProps {
@@ -74,9 +74,21 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <Music size={14} /> {isOpen && "MUSIC"}
             </button>
           </div>
+          {/* Live Button Row */}
+          <button
+                onClick={() => onSwitchMode('live')}
+                title="Live Mode"
+                className={clsx(
+                    "w-full mt-2 py-2 border-2 border-black font-bold font-mono text-xs flex items-center justify-center gap-1 transition-all",
+                    currentMode === 'live' ? "bg-neo-green text-black shadow-neo-sm" : "bg-white hover:bg-gray-200"
+                )}
+            >
+                <AudioLines size={14} /> {isOpen && "LIVE / VOICE"}
+            </button>
+
           {isOpen && (
             <div className="text-[10px] font-mono text-center uppercase text-gray-500 mt-2">
-                Active: {currentMode === 'video' ? 'Visual Intel' : 'Sonic Analyzer'}
+                Active: {currentMode === 'video' ? 'Visual Intel' : currentMode === 'music' ? 'Sonic Analyzer' : 'Native Audio'}
             </div>
           )}
       </div>

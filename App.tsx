@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Music, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Music, ChevronLeft, ChevronRight, Mic } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import LiveInterface from './components/LiveInterface';
 import ReasoningFlow from './components/ReasoningFlow';
 import { Message, HistoryItem, ReasoningStep, FileAttachment, AnalysisResult, Persona, AppMode, SongAnalysis, SessionData, AgentPlan } from './types';
 import { generateAnalysis, generateAgentAction } from './services/geminiService';
@@ -47,9 +48,11 @@ const App: React.FC = () => {
 
   // Helper to save the current state to the session store
   const saveCurrentSession = () => {
-     if (messages.length === 0) return;
+     if (messages.length === 0 && appMode !== 'live') return;
      
-     const currentTitle = history.find(h => h.id === currentSessionId)?.title || (appMode === 'music' ? 'Sonic Analysis' : `${persona} Analysis`);
+     const currentTitle = history.find(h => h.id === currentSessionId)?.title || 
+         (appMode === 'music' ? 'Sonic Analysis' : appMode === 'live' ? 'Voice Session' : `${persona} Analysis`);
+     
      const timestamp = history.find(h => h.id === currentSessionId)?.timestamp || new Date();
 
      const sessionData: SessionData = {
@@ -190,7 +193,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAgentAction = async (action: 'shorts' | 'remix' | 'soundtrack', context: any) => {
+  const handleAgentAction = async (action: 'shorts' | 'remix' | 'soundtrack' | 'visual_filter' | 'music_overlay', context: any) => {
       setIsStreaming(true);
       const modelMsgId = generateId();
       
@@ -249,7 +252,7 @@ const App: React.FC = () => {
       {/* CENTER: Chat Area */}
       <div className="flex-1 flex flex-col h-full min-w-[400px]">
         <div className="p-4 border-b-4 border-black bg-white flex justify-between items-center">
-             <h2 className="text-xl font-bold font-mono">NEO_STUDIO // {appMode === 'music' ? 'SONIC_LAB' : 'VISUAL_ENGINE'}</h2>
+             <h2 className="text-xl font-bold font-mono">NEO_STUDIO // {appMode === 'music' ? 'SONIC_LAB' : appMode === 'live' ? 'LIVE_INTERFACE' : 'VISUAL_ENGINE'}</h2>
              <div className="flex gap-2">
                  <div className="bg-neo-blue text-white px-2 py-1 text-xs border-2 border-black font-bold shadow-neo-sm">
                     GEMINI 3
@@ -259,15 +262,20 @@ const App: React.FC = () => {
                  </div>
              </div>
         </div>
-        <ChatInterface 
-            messages={messages} 
-            isStreaming={isStreaming} 
-            onSendMessage={handleSendMessage}
-            selectedPersona={persona}
-            onSelectPersona={setPersona}
-            appMode={appMode}
-            onAgentAction={handleAgentAction}
-        />
+        
+        {appMode === 'live' ? (
+            <LiveInterface />
+        ) : (
+            <ChatInterface 
+                messages={messages} 
+                isStreaming={isStreaming} 
+                onSendMessage={handleSendMessage}
+                selectedPersona={persona}
+                onSelectPersona={setPersona}
+                appMode={appMode}
+                onAgentAction={handleAgentAction}
+            />
+        )}
       </div>
 
       {/* RIGHT PANEL: Reasoning Visualization */}
@@ -296,12 +304,18 @@ const App: React.FC = () => {
                             <div>AUDIO MODE ACTIVE</div>
                             <div className="text-xs mt-2">Cognitive Map Disabled for Sonic Analysis</div>
                         </div>
+                    ) : appMode === 'live' ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center p-8 text-gray-400 font-mono">
+                            <Mic size={48} className="mb-4 opacity-50 animate-pulse" />
+                            <div>LIVE SESSION ACTIVE</div>
+                            <div className="text-xs mt-2">Real-time Latency: &lt;500ms</div>
+                        </div>
                     ) : (
                         <ReasoningFlow steps={steps} />
                     )}
                 </div>
                 <div className="bg-black text-white p-2 font-mono text-xs flex justify-between">
-                    <span>{appMode === 'music' ? 'MODE: AUDIO' : `PERSONA: ${persona.toUpperCase()}`}</span>
+                    <span>{appMode === 'music' ? 'MODE: AUDIO' : appMode === 'live' ? 'MODE: LIVE' : `PERSONA: ${persona.toUpperCase()}`}</span>
                     <span>NODES: {steps.length} / {pendingSteps.length > 0 ? pendingSteps.length : steps.length}</span>
                 </div>
             </>
